@@ -3,7 +3,8 @@ library(targets)
 tar_option_set(packages = c(
   'tidyverse',
   'ggdist',
-  'sf'
+  'sf',
+  'showtext'
 ))
 
 source('2_process/src/temp_utils.R')
@@ -77,6 +78,14 @@ list(
     prep_intervals(ci_data = p1_ci_data,
                    plot_date = p2_focal_date)
   ),
+  tar_target(
+    p2_daily_ci_csv,{
+      out_file <- '2_process/out/forecast_1day_intervals.csv'
+      write_csv(p2_daily_ci_data, out_file)
+      return(out_file)
+      },
+    format = 'file'
+  ),
   
   ##### VISUALIZE DATA #####
   tar_target(
@@ -100,10 +109,8 @@ list(
   tar_target(
     p3_daily_ci_png,
     plot_daily_ci(ci_interval_data = p2_daily_ci_data,
-                  ci_list = c(0.5, 0.8, 0.9), 
-                  plot_date = p2_focal_date,
-                  out_file = "3_visualize/out/daily_ci.png"),
-    format = 'file'
+                  ci_list = c(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9), 
+                  plot_date = p2_focal_date)
   )
 
 )

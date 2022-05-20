@@ -1,0 +1,98 @@
+---
+title: "DRB stream temperature forecasts"
+author: ""
+date: "Last updated: `r format(Sys.time(), '%B %d, %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+
+library(tidyverse)
+library(ggdist)
+library(plotly)
+library(reactable)
+library(crosstalk)
+library(showtext)
+library(sf)
+
+source('2_process/src/temp_utils.R')
+source('2_process/src/prep_intervals.R')
+source('3_visualize/src/plot_gradient.R')
+source('3_visualize/src/plot_daily_ci.R')
+source('3_visualize/src/map_exceedance_prob.R')
+
+```
+
+```{r forecast-table }
+
+
+```
+
+```{r}
+library(crosstalk)
+library(leaflet)
+library(DT)
+
+segs_sf <- readRDS('1_fetch/in/forecast_segs_shape.rds') %>%
+  select(seg_id_nat)
+
+daily_ci <- readr::read_csv('2_process/out/forecast_1day_intervals.csv') 
+
+ci_segs <- segs_sf %>%
+  left_join(daily_ci) %>%
+  st_transform(4326) %>% 
+  SharedData$new()
+
+daily_segs <- segs_sf %>% left_join(daily_ci %>% select(seg_id_nat, temp) %>% distinct()) %>%
+  select(seg_id_nat, temp) %>%
+  distinct() %>%
+  st_transform(4326)
+
+shared_data <- daily_segs %>% SharedData$new()
+#plot_ci <- plot_daily_ci(ci_interval_data = shared_data,
+#                  ci_list = c(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9), 
+#                  plot_date = as.Date('2022-01-20'))
+plot_ci <- shared_data %>%
+  ggplot(aes(y = reorder(seg_id_nat, temp),
+               group = seg_id_nat,
+               x = temp,
+               #xmin = .lower, xmax = .upper
+    )) +
+    #geom_interval(
+    #  aes(
+    #    #interval_color = ..y..
+    #  )
+    #) +
+    geom_tile(aes(fill = temp),
+              width = 1) +
+    #theme_ci(font_fam)+
+    scale_color_brewer() +
+    labs(y = 'Stream Segment', x = 'Predicted Stream Temperature (F)') +
+    scale_x_continuous(position = 'top') +
+    guides(fill = guide_legend(
+      "CI"
+    ))
+#ggplotly(plot_ci)
+
+# Create a filter input
+filter_slider("mag", "Temperature", shared_data, column=~temp, step=1, width=250)
+
+bscols(
+  ggplotly(
+  shared_data %>%
+    ggplot(aes(color = temp)) +
+    geom_sf() +
+    theme_void() + 
+    coord_sf() +
+    scico::scale_color_scico(name = "Temp ", palette = 'bilbao') +
+    scale_size_continuous(range = c(0,0.75)) +
+    guides(size = "none")
+  ),
+  ggplotly(plot_ci),
+  datatable(shared_data, extensions="Scroller", style="bootstrap", class="compact", width="100%",
+    options=list(deferRender=TRUE, scrollY=300, scroller=TRUE))
+  
+)
+
+```
