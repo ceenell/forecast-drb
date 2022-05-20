@@ -1,11 +1,12 @@
 
 #' @description Plot of single lead time for temperature predictions across many sites
 #' showing confidence intervals around predictions
-#' @param ci_data forecast data filtered to 1-day out lead time
+#' @param ci_interval_data forecast data filtered to 1-day out lead time; output of `prep_intervals()`
 #' @param ci_list a list of confidence intervals to find upper and lower bounds 
 #' must be a 0.1 degree increment ranging 0.1-0.9
+
 plot_daily_ci <- function(ci_interval_data, ci_list, plot_date){
-  
+
   plot_month <- lubridate::month(plot_date, label = TRUE, abbr = FALSE)
   plot_year <- lubridate::year(plot_date)
   
