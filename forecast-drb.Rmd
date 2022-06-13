@@ -1,0 +1,173 @@
+---
+title: "DRB stream temperature forecasts"
+date: "Last updated: `r format(Sys.time(), '%B %d, %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+
+library(targets)
+library(tidyverse)
+library(leaflet)
+library(leafpop)
+library(reactablefmtr)
+library(htmltools)
+library(sf)
+library(scico)
+
+#remotes::install_github("timelyportfolio/dataui")
+source('2_process/src/temp_utils.R')
+```
+
+```{r getData}
+
+# pull processed data from pipeline
+site_lordville <- 1573
+focal_date <- as.Date('2021-07-01')
+
+tar_load(p1_forecast_segs_sf)
+tar_load(p1_forecast_data)
+tar_load(p2_daily_ci_data)
+tar_load(p2_site_info)
+
+```
+
+```{r prepData, include = F }
+
+# filter to focal date, model types
+p2_forecast <- p1_forecast_data %>% 
+      filter(model_name != 'persistence') %>%
+      filter(lead_time == 1) %>%
+      filter(scenario == "+0cfs") 
+
+# bind to spatial data
+segs_sf <- p1_forecast_segs_sf %>%
+    transform(seg_id_nat = as.character(seg_id_nat)) 
+
+# prep table data
+segs_table <- p2_forecast %>%
+  filter(time == focal_date) %>%
+  select(seg_id_nat, model_name, max_temp_c_predicted:prob_exceed_75) %>%
+  mutate(max_temp_f_predicted = round(c_to_f(max_temp_c_predicted), 1)) %>%
+  rename(`Stream segment` = seg_id_nat, `Max temp (F)` = max_temp_f_predicted, `Probability > 75F` = prob_exceed_75) %>%
+  pivot_wider(id_cols = c(`Stream segment`), names_from = 'model_name', values_from = c(`Max temp (F)`, `Probability > 75F`))
+
+```
+
+### 1-day out forecasts for `r focal_date`  
+
+```{r mapData}
+
+segs_table %>%
+    #select(`Stream segment`, model_name, `Max temp (F)`, `Probability > 75F`) %>%
+  reactable(
+    compact = TRUE,
+    pagination = FALSE,
+  # variable-specific settings
+  columns = list(
+    `Max temp (F)_DA` = colDef(
+      cell = data_bars(segs_table, 
+                       fill_color = scico::scico(10, palette = "lapaz", end = 0.7),
+                       text_position = 'outside-end',
+                       #box_shadow = TRUE, 
+                       max_value = 85,
+                       #force_outside = c(0, 40),
+                     bar_height = 15
+                       )
+    ),
+    `Max temp (F)_noDA` = colDef(
+      cell = data_bars(segs_table, 
+                       fill_color = scico::scico(10, palette = "lapaz", end = 0.7),
+                       text_position = 'outside-end',
+                       #box_shadow = TRUE, 
+                       max_value = 85,
+                       #force_outside = c(0, 40),
+                     bar_height = 15
+                       )
+    ),
+    `Probability > 75F_DA` = colDef(
+      style = color_scales(segs_table, colors = scico::scico(9,palette = 'bilbao'))
+     #cell = data_bars(segs_table, 
+     #                 text_position = 'outside-end',
+     #                 #box_shadow = TRUE, 
+     #                 max_value = 1, 
+     #                 #force_outside = c(0,0.4),
+     #                 number_fmt = scales::percent,
+     #               bar_height = 15
+     #                 )
+    ),
+    `Probability > 75F_noDA` = colDef(
+      style = color_scales(segs_table, colors = scico::scico(9,palette = 'bilbao'))
+      #cell = data_bars(segs_table, 
+      #                 text_position = 'outside-end',
+      #                 #box_shadow = TRUE, 
+      #                 max_value = 1, 
+      #                 #force_outside = c(0,0.4),
+      #                 number_fmt = scales::percent,
+      #               bar_height = 15
+      #                 )
+    )
+  )
+) %>%
+  add_legend(segs_table, 
+             col_name = 'Max temp (F)_DA',
+             title = 'Temp (F)',
+             bins = 10,
+             colors = scico::scico(10, palette = "lapaz", end = 0.7))
+
+
+
+```  
+
+
+### Multi-day forecasts for each site
+
+```{r tableMulti}
+days_shown <- 7
+date_list <- seq.Date(from = focal_date, to = focal_date+days_shown, by = "1 day")
+
+p2_filt <- p2_forecast %>% 
+  filter(model_name == 'DA') #%>%
+  #filter(time == focal_date)
+
+p2_wide <- p2_filt %>%
+  select(seg_id_nat, time, max_temp_c_predicted) %>%
+  mutate(max_temp_f = round(c_to_f(max_temp_c_predicted),1)) %>%
+  select(-max_temp_c_predicted) %>%
+  mutate(time = paste0(lubridate::month(time),'/', lubridate::day(time))) %>%
+  pivot_wider(id_cols = 'seg_id_nat', names_from = 'time', values_from = 'max_temp_f') %>%
+  select(seg_id_nat, 72:85)
+
+reactable(
+  p2_wide,
+  pagination = FALSE,
+  defaultColDef = colDef(
+    maxWidth = 50,
+    style = color_scales(p2_wide, 
+                         span = TRUE, 
+                         colors = scico::scico(20, palette = "lapaz", end = 0.7))
+  ),
+ columns = list(
+   seg_id_nat = colDef(
+     maxWidth = 80,
+     align = 'left'
+   )
+ )
+)
+
+```  
+
+
+```{r}
+# try bars to show time series
+
+```
+
+
+
+```{r}
+# leaflet map with pop up charts for each segment
+
+```
+

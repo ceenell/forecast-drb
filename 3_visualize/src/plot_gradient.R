@@ -49,7 +49,7 @@ plot_gradient <- function(ensemble_data, site_info, date_start, days_shown, out_
                             end = 0.7,
                             na.value = "orangered") +
     scico::scale_color_scico(palette = "lapaz", 
-                            end = 0.5,
+                            end = 0.7,
                             na.value = "orangered") +
     # tile for mean prediction
     geom_tile(aes(x = time,
